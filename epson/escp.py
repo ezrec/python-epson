@@ -239,8 +239,8 @@ class Interface(object):
         else:
             cmode = 0
 
-        data = struct.pack("<BBBHHH", color, cmode, bpp,
-                           len(line), 1, len(line))
+        data = struct.pack("<BBBHH", color, cmode, bpp,
+                           len(line), 1)
         data += line
         self._send("\033i" + data)
         pass
@@ -340,7 +340,7 @@ class Job(Interface):
                     line = raster.bitline(y = y, ci = color, bpp = bpp)
                     self._send_line(line = line, bpp = bpp)
 
-                delta_y = 1.0 / self.dpi
+                delta_y = 25.4 / self.dpi
             pass
 
             self._form_feed()
