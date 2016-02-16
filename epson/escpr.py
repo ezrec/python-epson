@@ -22,12 +22,40 @@
 #  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 #  DEALINGS IN THE SOFTWARE.
 #
+
+import sys
 import time
 import struct
 import epson
 import epson.escp
 
 from epson.constant import *
+
+def RunLengthEncode(line = None, bytes_per_pixel = 3):
+    out = ""
+    repcnt = 0
+
+    pixel = 0
+    while pixel < len(line):
+        tpix = line[pixel:pixel+bytes_per_pixel]
+        next_pixel = pixel + bytes_per_pixel
+        if next_pixel < len(line):
+            npix = line[next_pixel:next_pixel+bytes_per_pixel]
+            repeat = 1
+            while (next_pixel < len(line) and
+                   repeat < 0x81 and
+                   npix == tpix):
+                next_pixel += bytes_per_pixel
+                repeat += 1
+                npix = line[next_pixel:next_pixel+bytes_per_pixel]
+                pass
+        else:
+            repeat = 1
+        out += chr(repeat-1)
+        out += tpix
+        pixel = next_pixel
+
+    return out
 
 class Interface(epson.escp.Interface):
     """ Base class for accessing EPSON ESC/P Raster printers """
@@ -75,7 +103,8 @@ class Interface(epson.escp.Interface):
         pass
 
     def _raster_check(self):
-        self._raster_cmd("u", "chku", "\001\001")
+        # Only needed on 'version 3' or higher printers?
+        # self._raster_cmd("u", "chku", "\001\001")
         pass
 
     def _raster_job(self, paper = MSID.LETTER, mlid = MLID.BORDERLESS, margin = (0, 0, 0, 0), dpi = 720, pd = PD.BIDIREC):
@@ -160,39 +189,26 @@ class Interface(epson.escp.Interface):
         self._raster_cmd("p","setn",chr(pageno))
         pass
 
-    def _send_data(self, cmd = None, data = None):
-        self._send("\033d" + struct.pack("<L", len(data)) + cmd + data)
-        pass
-
     def _send_jpeg(self, chunk):
         while len(chunk) > 0:
             size = len(chunk)
             if size > 0xffff:
                 size = 0xffff
-            self._send_data("jsnd", struct.pack(">H", size) + chunk[0:size])
+            self._raster_cmd("d","jsnd", struct.pack(">H", size) + chunk[0:size])
             chunk = chunk[size:]
             pass
         pass
 
     def _send_line(self, line = None, offset = (0, 0), compress = False):
-        # FIXME: Add RLE compression support
-        if compress == True:
-            compress = False
-
-        compressed_size = 0
-
         if compress:
+            line = epson.escpr.RunLengthEncode(line, 3)
             cmode = 1
         else:
             cmode = 0
 
-        data = struct.pack(">HHB",  offset[0], offset[1], cmode)
-        if compress:
-            data += struct.pack(">H", compressed_size) + compressed
-        else:
-            data += line
+        data = struct.pack(">HHBH",  offset[0], offset[1], cmode, len(line))
 
-        self._send_data("dsnd", data)
+        self._raster_cmd("d","dsnd", data + line)
         pass
 
     def _raster_endpage(self, pages_remaining = 0):
@@ -205,7 +221,7 @@ class Interface(epson.escp.Interface):
 class Job(Interface):
     """ EPSON ESC/P Raster Job Wrapper """
 
-    def __init__(self, io = None, name = "ESCPRLib"):
+    def __init__(self, io = None, name = "ESCPR-Py"):
         super(Job, self).__init__(io = io)
 
         # Job name
@@ -216,7 +232,7 @@ class Job(Interface):
         self.pd = PD.BIDIREC
 
         # Paper path
-        self.mpid = MPID.AUTO
+        self.mpid = MPID.REAR
         self.duplex = False
 
         self.cm = CM.COLOR
