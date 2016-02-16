@@ -1,23 +1,20 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from distutils.core import setup
 
 setup(
-        name='escpr',
-        verison='0.0.1',
-        description='Python library to manipulate ESC/P Raster Printers',
+        name='epson',
+        version='0.0.1',
+        description='Python library to manipulate EPSON ESC/P Printers',
         license='MIT',
-        url='https://github.com/ezrec/python-escprr',
-        download_url='https://github.com/ezrec/python-escpr.git',
+        url='https://github.com/ezrec/python-epson',
+        download_url='https://github.com/ezrec/python-epson.git',
         long_description=open('README.rst').read(),
         author='Jason S. McMullan',
         author_email='jason.mcmullan@gmail.com',
         platforms=['linux'],
-        packages=['escpr'],
+        packages=['epson'],
         package_data={'': []},
-        install_requires=[
-            'usb',
-            ],
         classifiers=[
             'Development Status :: 1 - Alpha',
             'License :: OSI Approved :: MIT',
