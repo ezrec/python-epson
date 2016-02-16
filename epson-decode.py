@@ -59,9 +59,23 @@ def escp_read(fin = None):
         rlen,   = struct.unpack("<L", fin.read(4))
         rcode  = fin.read(4)
         rdata  = fin.read(rlen)
+
+        escpr = { 'type': 'escpr', 'class': rclass, 'code': rcode }
+        if rclass == 'd':
+            if rcode == 'dsnd':
+                left, top, cmode, dlen = struct.unpack(">HHBH", rdata[0:7])
+                rdata = rdata[7:]
+                escpr['compress'] = cmode
+                escpr['x'] = left
+                escpr['y'] = top
+                pass
+            pass
+
         if rclass == 'j' and rcode == 'endj':
             protocol = 'escp'
-        return { 'type': 'escpr', 'class': rclass, 'code': rcode, 'data': rdata }
+
+        escpr['data'] = rdata
+        return escpr
 
     code = fin.read(1)
     escp = { 'type': protocol, 'code': code }
