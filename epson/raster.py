@@ -62,16 +62,33 @@ class TestImage(Image):
         if y > self.size[1]:
             return None
 
-        # Every 60 lines, change color
+        # Every 60 lines, change starting
         color = (y / 60) % 7
 
-        r = ((color >> 0) & 1) * 0xff
-        g = ((color >> 1) & 1) * 0xff
-        b = ((color >> 2) & 1) * 0xff
-        
-        rgb = struct.pack("BBB", r, g, b)
+        r = ((color >> 0) & 1)
+        g = ((color >> 1) & 1)
+        b = ((color >> 2) & 1)
 
-        return rgb * self.size[0]
+        rgb = ""
+        for i in range(0, self.size[0]):
+            # Fill with gradient
+            pos = 256 * i / self.size[0]
+            if r:
+                r_grad = pos
+            else:
+                r_grad = 255 - pos
+            if g:
+                g_grad = pos
+            else:
+                g_grad = 255 - pos
+            if b:
+                b_grad = pos
+            else:
+                b_grad = 255 - pos
+            rgb += struct.pack("BBB", r_grad, g_grad, b_grad)
+            pass
+        
+        return rgb
 
 
 #  vim: set shiftwidth=4 expandtab: # 
