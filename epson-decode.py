@@ -46,7 +46,14 @@ def escp_read(fin = None):
 
         cres, = struct.unpack("<B", fin.read(1))
         data = fin.read(clen-1)
-        return { 'type': protocol, 'code': code, 'response': cres, 'data': data }
+        escp = { 'type': protocol, 'code': code, 'response': cres }
+        if code == "TI":
+            date = struct.unpack(">HBBBBB", data)
+            escp['date'] = "%d-%d-%d,%d:%02d:%02d" % date
+        else:
+            escp['data'] = data
+            
+        return escp
 
     ch = fin.read(1)
     if len(ch) < 1:
@@ -70,11 +77,49 @@ def escp_read(fin = None):
                 escpr['y'] = top
                 pass
             pass
+        elif rclass == 'j':
+            if rcode == 'endj':
+                protocol = 'escp'
+                pass
+            elif rcode == 'setj':
+                width, height, top, left, rwidth, rheight, ir, pd = struct.unpack(">LLHHLLBB", rdata)
+                escpr['paper'] = (width, height)
+                escpr['margin'] = (left, top, (width - left - rwidth), (height - top - rheight))
+                dpi = 360
+                if ir == 0:
+                    dpi = 360
+                elif ir == 1:
+                    dpi = 720
+                elif ir == 2:
+                    dpi = 300
+                elif ir == 3:
+                    dpi = 600
+                escpr['dpi'] = dpi
+                escpr['pd'] = pd
+                rdata = None
+                pass
+            pass
+        elif rclass == 'q':
+            if rcode == 'setq':
+                mtid, mqid, cm, brightness, contrast, saturation, cp, plen = struct.unpack(">BBBbbbBH", rdata[0:9])
+                palette = rdata[9:]
+                escpr['mtid'] = mtid
+                escpr['mqid'] = mqid
+                escpr['cm'] = cm
+                escpr['brightness'] = brightness
+                escpr['contrast'] = contrast
+                escpr['saturation'] = saturation
+                escpr['cp'] = cp
+                if len(palette) == 0:
+                    palette = None
+                escpr['palette'] = palette
+                pass
+            pass
+                
 
-        if rclass == 'j' and rcode == 'endj':
-            protocol = 'escp'
+        if rdata is not None and len(rdata) > 0:
+            escpr['data'] = rdata
 
-        escpr['data'] = rdata
         return escpr
 
     code = fin.read(1)
