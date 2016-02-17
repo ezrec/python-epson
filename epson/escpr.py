@@ -25,6 +25,7 @@
 
 import sys
 import time
+import math
 import struct
 import epson
 import epson.escp
@@ -51,8 +52,22 @@ def RunLengthEncode(line = None, bytes_per_pixel = 3):
                 pass
         else:
             repeat = 1
-        out += chr(repeat-1)
-        out += tpix
+        if repeat == 1:
+            # Unique data
+            unique = 2
+            while (next_pixel < len(line) and
+                   repeat < 0x80 and
+                   npix != tpix):
+                next_pixel += bytes_per_pixel
+                unique += 1
+                npix = line[next_pixel:next_pixel+bytes_per_pixel]
+                pass
+            out += chr(unique - 1)
+            out += line[pixel:next_pixel]
+        else:
+            # Repeated data
+            out += chr(255 - repeat + 2)
+            out += tpix
         pixel = next_pixel
 
     return out
@@ -125,15 +140,15 @@ class Interface(epson.escp.Interface):
             margin = (0, 0, 0, 0)
 
         mm2in = 1.0/25.4
-        paperWidth = paper[0] * mm2in * dpi
-        paperHeight = paper[1] * mm2in * dpi
-        marginLeft = margin[0] * mm2in * dpi
-        marginTop = margin[1] * mm2in * dpi
-        marginRight = margin[2] * mm2in * dpi
-        marginBottom = margin[3] * mm2in * dpi
+        paperWidth = math.ceil(paper[0] * mm2in * dpi)
+        paperHeight = math.ceil(paper[1] * mm2in * dpi)
+        marginLeft = math.floor(margin[0] * mm2in * dpi)
+        marginTop = math.floor(margin[1] * mm2in * dpi)
+        marginRight = math.floor(margin[2] * mm2in * dpi)
+        marginBottom = math.floor(margin[3] * mm2in * dpi)
         printableWidth = paperWidth - marginLeft - marginRight
         printableHeight = paperHeight - marginTop - marginBottom
-        data = struct.pack(">LLLLLLBB", paperWidth, paperHeight,
+        data = struct.pack(">LLHHLLBB", paperWidth, paperHeight,
                                         marginTop, marginLeft,
                                         printableWidth, printableHeight,
                                         ir, pd)
@@ -221,14 +236,14 @@ class Interface(epson.escp.Interface):
 class Job(Interface):
     """ EPSON ESC/P Raster Job Wrapper """
 
-    def __init__(self, io = None, name = "ESCPR-Py"):
+    def __init__(self, io = None, name = "ESCPRLib"):
         super(Job, self).__init__(io = io)
 
         # Job name
         self.name = name
 
         # Output selection
-        self.dpi = 300
+        self.dpi = 360
         self.pd = PD.BIDIREC
 
         # Paper path
@@ -243,7 +258,7 @@ class Job(Interface):
         self.rde = RDE.NOTHING
 
         # Quality settings
-        self.mqid = MQID.DRAFT
+        self.mqid = MQID.HIGH
         self.cm = CM.COLOR
         self.brightness = 0
         self.contrast = 0
@@ -272,7 +287,7 @@ class Job(Interface):
         # REMOTE commands
         self._remote1_enter()
         self._time_init()
-        self._job_start(name = self.name)
+        self._job_start()
         self._job_header(job_name = self.name)
         self._hardware_device()
 
@@ -321,8 +336,6 @@ class Job(Interface):
                              cddim_id = self.cddim_id,
                              cddim_od = self.cddim_od)
             pass
-
-        self._raster_start_page()
 
         return size
 

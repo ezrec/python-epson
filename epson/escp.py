@@ -112,7 +112,7 @@ class Interface(object):
         self._remote1_cmd(self.RemoteTimeInit, data)
         pass
 
-    def _job_start(self, name = ""):
+    def _job_start(self, name = "\000\000"):
         data = name + "\000"
         self._remote1_cmd(self.RemoteJobStart, data)
         pass
@@ -121,11 +121,12 @@ class Interface(object):
         self._remote1_cmd(self.RemoteJobEnd)
         pass
 
-    def _job_header(self, job_type = 2, job_name = "ESCPPRLib", job_id = None):
+    def _job_header(self, job_type = 0, job_name = "ESCPPRLib", job_id = None):
         if job_id == None:
-            job_id = self.last_job + 1
+            job_id = self.last_job
         data = chr(job_type) + struct.pack(">L", job_id) + job_name
         self._remote1_cmd(self.RemoteJobHeader, data)
+        self.last_job = job_id + 1
         pass
 
     def _hardware_device(self, platform = 4):
@@ -299,7 +300,7 @@ class Job(Interface):
         # REMOTE commands
         self._remote1_enter()
         self._time_init()
-        self._job_start(name = self.name)
+        self._job_start()
         self._job_header(job_name = self.name)
         self._hardware_device()
 
