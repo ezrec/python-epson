@@ -26,6 +26,10 @@
 #  DEALINGS IN THE SOFTWARE.
 #
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import epson.io
 import epson.escp
 import epson.raster

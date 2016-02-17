@@ -23,6 +23,10 @@
 #  DEALINGS IN THE SOFTWARE.
 #
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import struct
 from epson.constant import *
 
@@ -48,13 +52,13 @@ class TestImage(Image):
         width = self.size[0]
 
         # Every 60 lines, change color
-        line_color = (y / 60) % 15
+        line_color = int(y / 60) % 15
 
         if (line_color & (1 << ci)) == 0:
             return None
 
         # Return a full raster line
-        return chr(0xff) * ((width + 7) / 8) * bpp
+        return chr(0xff) * int((width + 7) / 8) * bpp
 
     def line(self, y = 0):
         """ Retrieve a RGB 24-bit line from the bitmap """

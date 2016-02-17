@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import io
 from distutils.core import setup
 
@@ -10,7 +14,7 @@ setup(
         license='MIT',
         url='https://github.com/ezrec/python-epson',
         download_url='https://github.com/ezrec/python-epson.git',
-        long_description=io.open('README.rst').read(),
+        long_description=io.open('README.rst',"r").read(),
         author='Jason S. McMullan',
         author_email='jason.mcmullan@gmail.com',
         platforms=['linux'],
@@ -23,7 +27,7 @@ setup(
             'Intended Audience :: Developers',
             'Programming Language :: Python :: 3',
             'Topic :: System :: Peripherals',
-            'Topic :: Software Development :: Libraries :: Python Modules'
+            'Topic :: Software Development :: Libraries :: Python Modules',
             ],
         )
 
