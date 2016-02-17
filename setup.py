@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import io
 from distutils.core import setup
 
 setup(
@@ -9,7 +10,7 @@ setup(
         license='MIT',
         url='https://github.com/ezrec/python-epson',
         download_url='https://github.com/ezrec/python-epson.git',
-        long_description=open('README.rst').read(),
+        long_description=io.open('README.rst').read(),
         author='Jason S. McMullan',
         author_email='jason.mcmullan@gmail.com',
         platforms=['linux'],
@@ -20,7 +21,7 @@ setup(
             'License :: OSI Approved :: MIT',
             'Operating System :: GNU/Linux',
             'Intended Audience :: Developers',
-            'Programming Language :: Python',
+            'Programming Language :: Python :: 3',
             'Topic :: System :: Peripherals',
             'Topic :: Software Development :: Libraries :: Python Modules'
             ],

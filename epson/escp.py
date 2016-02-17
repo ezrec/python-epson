@@ -30,43 +30,43 @@ class Interface(object):
     """ Base class for accessing EPSON ESC/P Raster printers """
 
     # Exit packet mode
-    ExitPacketMode = "\000\000\000\033\001@EJL 1284.4\n@EJL     \n"
+    ExitPacketMode = b"\000\000\000\033\001@EJL 1284.4\n@EJL     \n"
     # Initilaize printer
-    InitPrinter = "\033@"
+    InitPrinter = b"\033@"
 
     # REMOTE1 protocol commands
     # Enter remote mode
-    EnterRemoteMode = "\033(R\010\000\000REMOTE1"
-    ExitRemoteMode = "\033\000\000\000"
+    EnterRemoteMode = b"\033(R\010\000\000REMOTE1"
+    ExitRemoteMode = b"\033\000\000\000"
 
     # Initialize time of day.
     # data = YYYY(be16), MM(8), DD(8), hh(8), mm(8), ss(8) 
-    RemoteTimeInit = "TI"
+    RemoteTimeInit = b"TI"
 
     # Mark start of job
     # data = 0, 0, 0
-    RemoteJobStart = "JS"
+    RemoteJobStart = b"JS"
 
     # Name the job
     # data = 0, 0, 0, 0, 0, "Name-of-job"
-    RemoteJobHeader = "JH"
+    RemoteJobHeader = b"JH"
 
     # Hardware Device (source platform)
     # data = 3, 4 (4 == Linux)
-    RemoteHardwareDevice = "HD"
+    RemoteHardwareDevice = b"HD"
 
     # PaperPath
     # data = dst, src
-    RemotePaperPath = "PP"
+    RemotePaperPath = b"PP"
 
     # DuplexPath
     # data = 2
-    RemoteDuplexPath = "DP"
+    RemoteDuplexPath = b"DP"
     # No data
-    RemoteLeaveDuplex = "LD"
+    RemoteLeaveDuplex = b"LD"
 
     # Job End
-    RemoteJobEnd = "JE"
+    RemoteJobEnd = b"JE"
 
     def __init__(self, io = None):
         """ Initialize class """
@@ -91,14 +91,14 @@ class Interface(object):
         pass
 
     def _form_feed(self):
-        self._send(chr(0xc))
+        self._send(byte(0xc))
 
     def _remote1_enter(self):
         self._send(self.EnterRemoteMode)
         pass
 
-    def _remote1_cmd(self, cmd, data = "", response = 0):
-        self._send(cmd + struct.pack("<H", len(data) + 1) + chr(response) + data)
+    def _remote1_cmd(self, cmd, data = b"", response = 0):
+        self._send(cmd + struct.pack("<H", len(data) + 1) + byte(response) + data)
         pass
 
     def _remote1_exit(self):
@@ -112,8 +112,11 @@ class Interface(object):
         self._remote1_cmd(self.RemoteTimeInit, data)
         pass
 
-    def _job_start(self, name = "\000\000"):
-        data = name + "\000"
+    def _job_start(self, name = None):
+        if name is None:
+            data = b"\000\000\000"
+        else:
+            data = name.encode() + b"\000"
         self._remote1_cmd(self.RemoteJobStart, data)
         pass
 
@@ -124,13 +127,13 @@ class Interface(object):
     def _job_header(self, job_type = 0, job_name = "ESCPPRLib", job_id = None):
         if job_id == None:
             job_id = self.last_job
-        data = chr(job_type) + struct.pack(">L", job_id) + job_name
+        data = byte(job_type) + struct.pack(">L", job_id) + job_name.encode()
         self._remote1_cmd(self.RemoteJobHeader, data)
         self.last_job = job_id + 1
         pass
 
     def _hardware_device(self, platform = 4):
-        data = "\003" + chr(platform)
+        data = b"\003" + byte(platform)
         self._remote1_cmd(self.RemoteHardwareDevice, data)
         pass
 
@@ -165,7 +168,7 @@ class Interface(object):
             dst = 1
             src = 0xff # Autoselect
 
-        data = chr(dst) + chr(src)
+        data = byte(dst) + byte(src)
         self._remote1_cmd(self.RemotePaperPath, data)
         pass
 
@@ -179,11 +182,11 @@ class Interface(object):
 
     """ Printing method control """
     def _direction(self, pd = PD.BIDIREC):
-        self._send("\033U" + chr(pd))
+        self._send(b"\033U" + byte(pd))
         pass
 
     def _color_mode(self, cm = CM.COLOR):
-        self._send("\033(K" + chr(1) + chr(0) + chr(0) + chr(cm))
+        self._send(b"\033(K" + byte(1) + byte(0) + byte(0) + byte(cm))
         pass
 
     def _image_resolution(self, dpi = 360):
@@ -194,7 +197,7 @@ class Interface(object):
         v = r / dpi
         h = r / dpi
         data = struct.pack("<HHBB", 4, r, v, h)
-        self._send("\033(D" + data)
+        self._send(b"\033(D" + data)
         pass
 
     def _set_unit(self, p_dpi = 360, h_dpi = 360, v_dpi = 360):
@@ -203,7 +206,7 @@ class Interface(object):
         h = base / h_dpi
         v = base / v_dpi
         data = struct.pack("<HBBBH", 5, p, v, h, base)
-        self._send("\033(U" + data)
+        self._send(b"\033(U" + data)
 
     def _page_format(self, msid = MSID.LETTER, margin = (0, 0, 0, 0), dpi = 360):
         mm2in = 1.0/25.4
@@ -214,20 +217,20 @@ class Interface(object):
         x_left = int(margin[0] * mm2in * dpi)
         x_right = int(margin[2] * mm2in * dpi)
         data = struct.pack("<HLL", 8, y_top, y_bottom)
-        self._send("\033(c" + data)
+        self._send(b"\033(c" + data)
 
         return (x_right - x_left, y_bottom - y_top)
 
     def _vertical_position(self, y = 0, dpi = 360):
         mm2in = 1.0/25.4
         data = struct.pack("<HL", 4, int(y * mm2in * dpi))
-        self._send("\033(v" + data)
+        self._send(b"\033(v" + data)
         pass
 
     def _horizontal_position(self, x = 0, dpi = 360):
         mm2in = 1.0/25.4
         data = struct.pack("<HL", 4, int(x * mm2in * dpi))
-        self._send("\033(/" + data)
+        self._send(b"\033(/" + data)
         pass
 
     def _send_line(self, color = CI.BLACK, line = None, bpp = 1):
@@ -243,7 +246,7 @@ class Interface(object):
         data = struct.pack("<BBBHH", color, cmode, bpp,
                            len(line), 1)
         data += line
-        self._send("\033i" + data)
+        self._send(b"\033i" + data)
         pass
                             
 class Job(Interface):

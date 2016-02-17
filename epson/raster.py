@@ -63,16 +63,16 @@ class TestImage(Image):
             return None
 
         # Every 60 lines, change starting
-        color = (y / 60) % 7
+        color = int(y / 60) % 7
 
         r = ((color >> 0) & 1)
         g = ((color >> 1) & 1)
         b = ((color >> 2) & 1)
 
-        rgb = ""
+        rgb = b""
         for i in range(0, self.size[0]):
             # Fill with gradient
-            pos = 256 * i / self.size[0]
+            pos = int(256 * i / self.size[0])
             if r:
                 r_grad = pos
             else:

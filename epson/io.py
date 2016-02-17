@@ -23,6 +23,9 @@
 #  DEALINGS IN THE SOFTWARE.
 #
 
+from __future__ import absolute_import
+
+import io
 import sys
 import usb.core
 
@@ -53,7 +56,7 @@ class File(Io):
         pass
 
     def open(self):
-        self.fd = open(self.filename, "wb")
+        self.fd = io.open(self.filename, "wb")
         pass
 
     def close(self):

@@ -33,7 +33,7 @@ import epson.escp
 from epson.constant import *
 
 def RunLengthEncode(line = None, bytes_per_pixel = 3):
-    out = ""
+    out = b""
     repcnt = 0
 
     pixel = 0
@@ -62,11 +62,11 @@ def RunLengthEncode(line = None, bytes_per_pixel = 3):
                 unique += 1
                 npix = line[next_pixel:next_pixel+bytes_per_pixel]
                 pass
-            out += chr(unique - 1)
+            out += byte(unique - 1)
             out += line[pixel:next_pixel]
         else:
             # Repeated data
-            out += chr(255 - repeat + 2)
+            out += byte(255 - repeat + 2)
             out += tpix
         pixel = next_pixel
 
@@ -76,9 +76,9 @@ class Interface(epson.escp.Interface):
     """ Base class for accessing EPSON ESC/P Raster printers """
 
     # ESC/P-R mode
-    ESCPRMode = "\033(R\006\000\000ESCPR"
+    ESCPRMode = b"\033(R\006\000\000ESCPR"
     # ESC/P-R JPEG mode
-    ESCPRModeJpg = "\033(R\007\000\000ESCPRJ"
+    ESCPRModeJpg = b"\033(R\007\000\000ESCPRJ"
 
     def __init__(self, io = None):
         """ Initialize class """
@@ -97,24 +97,24 @@ class Interface(epson.escp.Interface):
     """ Raster Mode command wrappers """
     def _raster_cmd(self, cmd, code, data = None):
         if data is None:
-            data = ""
-        self._send("\033" + cmd + struct.pack("<L", len(data)) + code + data)
+            data = b""
+        self._send(b"\033" + cmd + struct.pack("<L", len(data)) + code + data)
 
     def _raster_quality(self, mtid = MTID.PLAIN, mqid = MQID.DRAFT, cm = CM.COLOR, brightness = 0, contrast = 0, saturation = 0, cp = CP.FULLCOLOR, palette = None):
         if palette is None:
-            palette = ""
+            palette = b""
 
-        data = ( chr(mtid) +
-                 chr(mqid) +
-                 chr(cm) +
-                 chr(clamp(-50,brightness,50)) +
-                 chr(clamp(-50,contrast,50)) +
-                 chr(clamp(-50,saturation,50)) +
-                 chr(cp) +
+        data = ( byte(mtid) +
+                 byte(mqid) +
+                 byte(cm) +
+                 byte(clamp(-50,brightness,50)) +
+                 byte(clamp(-50,contrast,50)) +
+                 byte(clamp(-50,saturation,50)) +
+                 byte(cp) +
                  struct.pack(">H", len(palette)) +
                  palette
                )
-        self._raster_cmd("q", "setq", data)
+        self._raster_cmd(b"q", b"setq", data)
         pass
 
     def _raster_check(self):
@@ -153,17 +153,17 @@ class Interface(epson.escp.Interface):
                                         printableWidth, printableHeight,
                                         ir, pd)
 
-        self._raster_cmd("j", "setj", data)
+        self._raster_cmd(b"j", b"setj", data)
         return (printableWidth, printableHeight)
 
     def _jpeg_auto_photo_fix(self, cm = CM.COLOR, act = ACT.NOTHING, sharpness = 0, rde = RDE.NOTHING):
-        data = chr(cm) + chr(act) + chr(clamp(-50, sharpness, 50)) + chr(rde)
-        self._raster_cmd("a", "seta", data)
+        data = byte(cm) + byte(act) + byte(clamp(-50, sharpness, 50)) + byte(rde)
+        self._raster_cmd(b"a", b"seta", data)
         pass
 
     def _jpeg_copies(self, copies = 1):
-        data = chr(clamp(1, copies, 255))
-        self._raster_cmd("c", "setc", data)
+        data = byte(clamp(1, copies, 255))
+        self._raster_cmd(b"c", b"setc", data)
         pass
 
     def _jpeg_job(self):
@@ -171,17 +171,17 @@ class Interface(epson.escp.Interface):
         pass
 
     def _jpeg_size(self, mlid = MLID.BORDERLESS, pd = PD.BIDIREC, cddim_id = None, cddim_od = None):
-        data = chr(99) # Custom size - always send _raster_job before this!
+        data = byte(99) # Custom size - always send _raster_job before this!
 
         # Media layout
         if mlid == MLID.BORDERLESS:
-            data += chr(0x01)
+            data += byte(0x01)
         elif mlid == MLID.CDLABEL:
-            data += chr(0x09)
+            data += byte(0x09)
         elif mlid == MLID.DIVIDE16:
-            data += chr(0x90)
+            data += byte(0x90)
         else:
-            data += chr(0)
+            data += byte(0)
 
         if cddim_id is None:
             cddim_id = 43
@@ -189,19 +189,19 @@ class Interface(epson.escp.Interface):
         if cddim_od is None:
             cddim_od = 116
 
-        data += chr(clamp(18, cddim_id, 46))
-        data += chr(clamp(114, cddim_od, 120))
-        date += chr(pd)
+        data += byte(clamp(18, cddim_id, 46))
+        data += byte(clamp(114, cddim_od, 120))
+        date += byte(pd)
 
-        self,_raster_cmd("j", "sets", data)
+        self,_raster_cmd(b"j", b"sets", data)
         pass
 
     def _raster_start_page(self):
-        self._raster_cmd("p", "sttp")
+        self._raster_cmd(b"p", b"sttp")
         pass
 
     def _raster_printnum2(self, pageno = 1):
-        self._raster_cmd("p","setn",chr(pageno))
+        self._raster_cmd(b"p",b"setn",byte(pageno))
         pass
 
     def _send_jpeg(self, chunk):
@@ -209,7 +209,7 @@ class Interface(epson.escp.Interface):
             size = len(chunk)
             if size > 0xffff:
                 size = 0xffff
-            self._raster_cmd("d","jsnd", struct.pack(">H", size) + chunk[0:size])
+            self._raster_cmd(b"d",b"jsnd", struct.pack(">H", size) + chunk[0:size])
             chunk = chunk[size:]
             pass
         pass
@@ -223,15 +223,15 @@ class Interface(epson.escp.Interface):
 
         data = struct.pack(">HHBH",  offset[0], offset[1], cmode, len(line))
 
-        self._raster_cmd("d","dsnd", data + line)
+        self._raster_cmd(b"d",b"dsnd", data + line)
         pass
 
     def _raster_endpage(self, pages_remaining = 0):
-        self._raster_cmd("p", "endp", chr(pages_remaining))
+        self._raster_cmd(b"p", b"endp", byte(pages_remaining))
         pass
 
     def _raster_endjob(self):
-        self._raster_cmd("j", "endj")
+        self._raster_cmd(b"j", b"endj")
 
 class Job(Interface):
     """ EPSON ESC/P Raster Job Wrapper """

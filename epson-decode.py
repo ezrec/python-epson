@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Decode an ESC/P file into a human-readable format
 #
@@ -40,9 +40,9 @@ def escp_read(fin = None):
             return None
 
         clen, = struct.unpack("<H", fin.read(2))
-        if code == '\033\000' and clen == 0:
+        if code == b'\033\000' and clen == 0:
             protocol = 'escp'
-            return { 'type': protocol, 'code': "\000", 'data': "\000\000" }
+            return { 'type': protocol, 'code': b"\000", 'data': b"\000\000" }
 
         cres, = struct.unpack("<B", fin.read(1))
         data = fin.read(clen-1)
@@ -58,7 +58,7 @@ def escp_read(fin = None):
     ch = fin.read(1)
     if len(ch) < 1:
         return None
-    if ch != '\033':
+    if ch != b'\033':
         return { 'type': 'char', 'char': ch }
 
     if protocol == 'escpr':
@@ -68,8 +68,8 @@ def escp_read(fin = None):
         rdata  = fin.read(rlen)
 
         escpr = { 'type': 'escpr', 'class': rclass, 'code': rcode }
-        if rclass == 'd':
-            if rcode == 'dsnd':
+        if rclass == b'd':
+            if rcode == b'dsnd':
                 left, top, cmode, dlen = struct.unpack(">HHBH", rdata[0:7])
                 rdata = rdata[7:]
                 escpr['compress'] = cmode
@@ -77,11 +77,11 @@ def escp_read(fin = None):
                 escpr['y'] = top
                 pass
             pass
-        elif rclass == 'j':
-            if rcode == 'endj':
+        elif rclass == b'j':
+            if rcode == b'endj':
                 protocol = 'escp'
                 pass
-            elif rcode == 'setj':
+            elif rcode == b'setj':
                 width, height, top, left, rwidth, rheight, ir, pd = struct.unpack(">LLHHLLBB", rdata)
                 escpr['paper'] = (width, height)
                 escpr['margin'] = (left, top, (width - left - rwidth), (height - top - rheight))
@@ -99,8 +99,8 @@ def escp_read(fin = None):
                 rdata = None
                 pass
             pass
-        elif rclass == 'q':
-            if rcode == 'setq':
+        elif rclass == b'q':
+            if rcode == b'setq':
                 mtid, mqid, cm, brightness, contrast, saturation, cp, plen = struct.unpack(">BBBbbbBH", rdata[0:9])
                 palette = rdata[9:]
                 escpr['mtid'] = mtid
@@ -125,13 +125,13 @@ def escp_read(fin = None):
     code = fin.read(1)
     escp = { 'type': protocol, 'code': code }
 
-    if code == '\001': # Exit packet mode
-        data = ""
+    if code == b'\001': # Exit packet mode
+        data = b""
         nl = 0
         while True:
             ch = fin.read(1)
             data += ch
-            if ch == '\n':
+            if ch == b'\n':
                 nl = nl + 1
                 if nl == 2:
                     escp['data'] = data
@@ -139,30 +139,30 @@ def escp_read(fin = None):
                 pass
             pass
         pass
-    elif code == '@': # Init printer
+    elif code == b'@': # Init printer
         pass
-    elif code == 'i': # Raster data
+    elif code == b'i': # Raster data
         spec = fin.read(7)
         color, cmode, bpp, bwidth, lines = struct.unpack("<BBBHH", spec)
         data = fin.read(bwidth)
         escp['data'] = spec + data
-        escp['bitmap'] = { 'color': color, 'compress': cmode, 'bpp': bpp, 'width': bwidth/bpp*8, 'height': lines }
-    elif code == '(': # Extended 
+        escp['bitmap'] = { 'color': color, 'compress': cmode, 'bpp': bpp, 'width': int(bwidth/bpp*8), 'height': lines }
+    elif code == b'(': # Extended 
         ecode = fin.read(1)
         elen,  = struct.unpack("<H", fin.read(2))
         data  = fin.read(elen)
         escp['extended'] = ecode
-        if ecode == 'R':
+        if ecode == b'R':
             escp['response'] = data[0]
             data = data[1:]
             escp['protocol'] = data
-            if data == 'REMOTE1':
+            if data == b'REMOTE1':
                 protocol = 'remote1'
-            elif data == 'ESCPR' or protocol[1:] == 'ESCPRJ':
+            elif data == b'ESCPR' or data == b'ESCPRJ':
                 protocol = 'escpr'
-        elif ecode == 'v':  # Vertical offset
+        elif ecode == b'v':  # Vertical offset
             escp['offset'], = struct.unpack("<L", data)
-        elif ecode == '/':  # Horizontal offset
+        elif ecode == b'/':  # Horizontal offset
             escp['offset'], = struct.unpack("<L", data)
         else:
             escp['data'] = data
@@ -170,17 +170,22 @@ def escp_read(fin = None):
 
     return escp
 
-def main(fin = None, fout = None):
+def main(fin = None):
     while True:
         escp = escp_read(fin)
         if escp is None:
             break
 
-        print >>fout, escp
+        print(escp)
         pass
     return
 
 if __name__ == "__main__":
-    main(sys.stdin, sys.stdout)
+    try:
+        # Python3
+        fin = sys.stdin.buffer
+    except:
+        fin = sys.stdin
+    main(fin)
 
 #  vim: set shiftwidth=4 expandtab: # 

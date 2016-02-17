@@ -33,6 +33,9 @@ def enum(*sequential, **named):
 def clamp(minvalue, value, maxvalue):
     return ctypes.c_ubyte(max(minvalue, min(value, maxvalue))).value
 
+def byte(*sequential):
+    return bytearray(sequential)
+
 # Print direction
 PD = enum(BIDIREC = 0, UNIDIREC = 1, UNIDIRECT_RL = 1, AUTO = 2, UNIDIRECT_LR = 2)
 
