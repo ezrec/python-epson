@@ -74,10 +74,10 @@ class File(Io):
             self.fd.write(data)
         pass
 
-def Usb(Io):
+class Usb(Io):
     """ EPSON USB Transport """
 
-    def __init__(self, vendor, product, interface = 0, out_ep = 0x01, in_ep = 0x82):
+    def __init__(self, vendor = None, product = None, interface = 0, ep_out = 0x0, ep_in = 0x81):
         """
         @param vendor    : Vendor ID
         @param product   : Product ID
@@ -88,8 +88,8 @@ def Usb(Io):
         self.vendor = vendor
         self.product = product
         self.interface = interface
-        self.out_ep = out_ep
-        self.in_ep = in_ep
+        self.ep_out = ep_out
+        self.ep_in = ep_in
         pass
 
     def open(self):
@@ -109,9 +109,10 @@ def Usb(Io):
         except NotImplementedError:
             pass
 
+        print (dev)
+
         try:
-            dev.set_configuration()
-            dev.reset()
+            dev.set_configuration(1)
         except usb.core.USBError as e:
             print >>sys.stderr, "Could not set configuration: %s" % str(e)
             return
@@ -126,7 +127,8 @@ def Usb(Io):
         pass
 
     def send(self, data):
-        self.device.write(self.out_ep, data, self.interface)
+        
+        self.device.write(endpoint = self.ep_out, data = data, timeout = 100000)
         pass
 
 
