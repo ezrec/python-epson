@@ -189,59 +189,94 @@ class Interface(object):
         self._send(b"\033U" + byte(pd))
         pass
 
-    def _color_mode(self, cm = CM.COLOR):
-        self._send(b"\033(K" + byte(1) + byte(0) + byte(0) + byte(cm))
+    def _send_ext(self, code, data = None):
+        self._send(b"\033(" + code + struct.pack("<H", len(data)) + data)
         pass
 
-    def _image_resolution(self, dpi = 360):
-        if (dpi % 360) == 0:
-            r = 1440
-        else:
-            r = 1200
-        v = r / dpi
-        h = r / dpi
-        data = struct.pack("<HHBB", 4, r, v, h)
-        self._send(b"\033(D" + data)
+    def _graphics_mode(self):
+        self._send_ext(b"G", struct.pack("<B", 1))
+        pass
+
+    def _color_mode(self, cm = CM.COLOR):
+        self._send_ext(b"K", struct.pack("<BB", 0, cm))
+        pass
+
+    def _image_resolution(self, h_dpi = 360, v_dpi = 120):
+        base = 1440
+        v = base // h_dpi
+        h = base // v_dpi
+        data = struct.pack("<HBB", base, v, h)
+        self._send_ext(b"D", data)
         pass
 
     def _set_unit(self, p_dpi = 360, h_dpi = 360, v_dpi = 360):
-        base = 1440
-        p = base / p_dpi
-        h = base / h_dpi
-        v = base / v_dpi
-        data = struct.pack("<HBBBH", 5, p, v, h, base)
-        self._send(b"\033(U" + data)
+        base = max([p_dpi, h_dpi, v_dpi])
+        if base == min([p_dpi, h_dpi, v_dpi]):
+            # Use the non-extended version (since all DPIs are the same)
+            data = struct.pack("<B", 3600//p_dpi)
+            self._send_ext(b"U", data)
+        else:
+            # Use the extended version (for differing DPIs)
+            p = base // p_dpi
+            h = base // h_dpi
+            v = base // v_dpi
+            data = struct.pack("<BBBH", p, v, h, base)
+            self._send_ext(b"U", data)
+        pass
 
     def _page_format(self, msid = MSID.LETTER, margin = (0, 0, 0, 0), dpi = 360):
         mm2in = 1.0/25.4
-        self._image_resolution(dpi = dpi)
-        self._set_unit(p_dpi = dpi, h_dpi = dpi, v_dpi = dpi)
         y_top = int(margin[1] * mm2in * dpi)
         y_bottom = int((msid[1] - margin[3]) * mm2in * dpi)
         x_left = int(margin[0] * mm2in * dpi)
         x_right = int(margin[2] * mm2in * dpi)
-        data = struct.pack("<HLL", 8, y_top, y_bottom)
-        self._send(b"\033(c" + data)
+        data = struct.pack("<LL", y_top, y_bottom)
+        self._send_ext(b"c", data)
 
         return (x_right - x_left, y_bottom - y_top)
 
-    def _vertical_position(self, y = 0, dpi = 360):
-        mm2in = 1.0/25.4
-        data = struct.pack("<HL", 4, int(y * mm2in * dpi))
-        self._send(b"\033(v" + data)
+    def _dot_size(self, dpi = 360):
+        # FIXME: Determine the correct dot size
+        # dot_size = ??
+        # self._send_ext(b"e", struct.pack("<BB", 0, dot_size))
         pass
 
-    def _horizontal_position(self, x = 0, dpi = 360):
-        mm2in = 1.0/25.4
-        data = struct.pack("<HL", 4, int(x * mm2in * dpi))
-        self._send(b"\033(/" + data)
+    def _vertical_position(self, y = 0):
+        data = struct.pack("<L", y)
+        self._send_ext(b"V", data)
         pass
 
-    def _send_line(self, color = CI.BLACK, line = None, bpp = 1):
+    def _vertical_increment(self, y = 0):
+        data = struct.pack("<L", y)
+        self._send_ext(b"v", data)
+        pass
+
+    def _horizontal_position(self, x = 0):
+        data = struct.pack("<L", x)
+        self._send_ext(b"$", data)
+        pass
+
+    def _horizontal_increment(self, x = 0):
+        data = struct.pack("<L", x)
+        self._send_ext(b"/", data)
+        pass
+
+    def _paper_dimension(self, msid = (0, 0), dpi = 360):
+        mm2in = 1.0/25.4
+        width = msid[0] * mm2in * dpi
+        height= msid[1] * mm2in * dpi
+        data = struct.pack("<LL", width, height)
+        self._send_ext(b"S", data)
+        pass
+
+    def _print_method(self, method = 0x12):
+        self._send_ext(b"m", struct.pack("<B", method))
+        pass
+
+    def _send_line(self, color = CI.BLACK, line = None, bpp = 1, compressed = True):
         if line is None or len(line) == 0:
             return
 
-        compressed = False
         if compressed:
             cmode = 1
         else:
@@ -249,7 +284,11 @@ class Interface(object):
 
         data = struct.pack("<BBBHH", color, cmode, bpp,
                            len(line), 1)
-        data += line
+        if compressed:
+            data += RunLengthEncode(line = line, bytes_per_pixel = 1);
+        else:
+            data += line
+
         self._send(b"\033i" + data)
         pass
                             
@@ -263,7 +302,7 @@ class Job(Interface):
         self.name = name
 
         # Output selection
-        self.dpi = 300
+        self.dpi = 360
         self.pd = PD.BIDIREC
 
         # Paper path
@@ -302,7 +341,6 @@ class Job(Interface):
            self.mlid = MLID.CDLABEL
 
         self._exit_packet_mode()
-        self._init_printer()
 
         # REMOTE commands
         self._remote1_enter()
@@ -317,9 +355,20 @@ class Job(Interface):
         self._remote1_exit()
 
         # ESC/P setup commands
-        self._direction(pd = self.pd)
-        self._color_mode(cm = self.cm)
+        self._init_printer()
+        self._graphics_mode()                           # \e(G
+        self._set_unit(self.dpi, self.dpi, self.dpi)    # \e(U
+
+        # ESC/P printing method
+        self._direction(pd = self.pd)                   # \eU
+        self._color_mode(cm = self.cm)                  # \e(K
+        self._dot_size(self.dpi)                        # \e(e
+        self._image_resolution()                        # \e(D
+
+        # ESC/P set print format
         size = self._page_format(msid = self.msid, margin = self.margin, dpi = self.dpi)
+        self._paper_dimension(msid = self.msid)         # \e(S
+        self._print_method()                            # \e(m
 
         return size
 
@@ -336,19 +385,21 @@ class Job(Interface):
     def print_pages(self, rasters = None, bpp = 1):
 
         size = self._start()
+        mm2in = 1.0/25.4
+
+        delta_x = int(self.margin[0] * mm2in * self.dpi)
+        delta_y = int(self.margin[1] * mm2in * self.dpi)
 
         for raster in rasters:
-            delta_y = self.margin[1]
 
+            self._vertical_position(y = delta_y)
             for y in range(0, min(size[1], raster.size[1])):
-                self._vertical_position(y = delta_y, dpi = self.dpi)
-                self._horizontal_position(x = self.margin[0], dpi = self.dpi)
-
                 for color in range(0,4):
                     line = raster.bitline(y = y, ci = color, bpp = bpp)
+                    self._horizontal_position(x = delta_x)
                     self._send_line(line = line, bpp = bpp)
 
-                delta_y = 25.4 / self.dpi
+                self._vertical_increment(y = 1)
             pass
 
             self._form_feed()
