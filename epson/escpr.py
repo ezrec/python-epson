@@ -36,46 +36,6 @@ import epson.escp
 
 from epson.constant import *
 
-def RunLengthEncode(line = None, bytes_per_pixel = 3):
-    out = b""
-    repcnt = 0
-
-    pixel = 0
-    while pixel < len(line):
-        tpix = line[pixel:pixel+bytes_per_pixel]
-        next_pixel = pixel + bytes_per_pixel
-        if next_pixel < len(line):
-            npix = line[next_pixel:next_pixel+bytes_per_pixel]
-            repeat = 1
-            while (next_pixel < len(line) and
-                   repeat < 0x81 and
-                   npix == tpix):
-                next_pixel += bytes_per_pixel
-                repeat += 1
-                npix = line[next_pixel:next_pixel+bytes_per_pixel]
-                pass
-        else:
-            repeat = 1
-        if repeat == 1:
-            # Unique data
-            unique = 2
-            while (next_pixel < len(line) and
-                   repeat < 0x80 and
-                   npix != tpix):
-                next_pixel += bytes_per_pixel
-                unique += 1
-                npix = line[next_pixel:next_pixel+bytes_per_pixel]
-                pass
-            out += byte(unique - 1)
-            out += line[pixel:next_pixel]
-        else:
-            # Repeated data
-            out += byte(255 - repeat + 2)
-            out += tpix
-        pixel = next_pixel
-
-    return out
-
 class Interface(epson.escp.Interface):
     """ Base class for accessing EPSON ESC/P Raster printers """
 
