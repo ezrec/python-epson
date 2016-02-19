@@ -35,6 +35,24 @@ import struct
 
 protocol = 'escp'
 
+def rle_read(fin = None, blen = 0, cmode = False):
+    if not cmode:
+        return fin.read(blen)
+
+    data = b""
+    while blen > 0:
+        c = ord(fin.read(1))
+        if c < 0x80:
+            data += fin.read(c + 1)
+            blen -= (c+1)
+        else:
+            element = fin.read(1)
+            data += element * (257 - c)
+            blen -= (257 - c)
+            pass
+        pass
+    return data
+
 def escp_read(fin = None):
     global protocol
 
@@ -148,9 +166,13 @@ def escp_read(fin = None):
     elif code == b'i': # Raster data
         spec = fin.read(7)
         color, cmode, bpp, bwidth, lines = struct.unpack("<BBBHH", spec)
-        data = fin.read(bwidth)
-        escp['data'] = spec + data
-        escp['bitmap'] = { 'color': color, 'compress': cmode, 'bpp': bpp, 'width': int(bwidth/bpp*8), 'height': lines }
+        data = rle_read(fin, bwidth, cmode)
+        escp['color'] = color
+        escp['compress'] = cmode
+        escp['bpp'] = bpp
+        escp['width'] = int(bwidth/bpp*8)
+        escp['height'] = lines
+        escp['raster'] = data
     elif code == b'(': # Extended 
         ecode = fin.read(1)
         elen,  = struct.unpack("<H", fin.read(2))
