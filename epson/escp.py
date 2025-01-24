@@ -22,6 +22,7 @@
 #  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 #  DEALINGS IN THE SOFTWARE.
 #
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -400,6 +401,3 @@ class Job(Interface):
             self._form_feed()
 
         self._end()
-
-
-#  vim: set shiftwidth=4 expandtab: #
