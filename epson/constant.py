@@ -40,14 +40,14 @@ def clamp(minvalue, value, maxvalue):
 def byte(*sequential):
     return bytearray(sequential)
 
-def RunLengthEncode(line = None, bytes_per_pixel = 3):
+def run_length_encode(line: bytes, bytes_per_pixel = 3):
     out = b""
-    repcnt = 0
 
     pixel = 0
     while pixel < len(line):
         tpix = line[pixel:pixel+bytes_per_pixel]
         next_pixel = pixel + bytes_per_pixel
+        repeat = 1
         if next_pixel < len(line):
             npix = line[next_pixel:next_pixel+bytes_per_pixel]
             repeat = 1
@@ -57,9 +57,7 @@ def RunLengthEncode(line = None, bytes_per_pixel = 3):
                 next_pixel += bytes_per_pixel
                 repeat += 1
                 npix = line[next_pixel:next_pixel+bytes_per_pixel]
-                pass
-        else:
-            repeat = 1
+
         if repeat == 1:
             # Unique data
             unique = 2
@@ -69,7 +67,6 @@ def RunLengthEncode(line = None, bytes_per_pixel = 3):
                 next_pixel += bytes_per_pixel
                 unique += 1
                 npix = line[next_pixel:next_pixel+bytes_per_pixel]
-                pass
             out += byte(unique - 1)
             out += line[pixel:next_pixel]
         else:
