@@ -28,6 +28,7 @@ from __future__ import division
 from __future__ import print_function
 
 import struct
+from typing import Optional
 from epson.constant import *
 
 class Image(object):
@@ -35,21 +36,19 @@ class Image(object):
     def __init__(self, size = (0, 0)):
         self.size = size[:]
 
-    def bitline(self, y = 0, ci = CI.BLACK, bpp = 1):
+    def bitline(self, y = 0, ci = CI.BLACK, bpp = 1) -> Optional[bytes]:
         """ Retrieve a bitmap of a line in a single color """
-        return ""
+        return b""
 
     def line(self, y = 0):
-        """ Retieve a RGB 24-bit line from the bitmap """
+        """ Retrieve a RGB 24-bit line from the bitmap """
         return ""
 
 class TestImage(Image):
     """ Test Image """
 
-    def bitline(self, y = 0, ci = CI.BLACK, bpp = 1):
+    def bitline(self, y = 0, ci = CI.BLACK, bpp = 1) -> Optional[bytes]:
         """ Retrieve a bitmap of a line in a single color """
-
-        width = self.size[0]
 
         # Every 60 lines, change color
         line_color = int(y / 60) % 15
@@ -57,8 +56,10 @@ class TestImage(Image):
         if (line_color & (1 << ci)) == 0:
             return None
 
+        width = self.size[0]
+
         # Return a full raster line
-        return chr(0xff) * int((width + 7) / 8) * bpp
+        return b"\xff" * int((width + 7) / 8) * bpp
 
     def line(self, y = 0):
         """ Retrieve a RGB 24-bit line from the bitmap """

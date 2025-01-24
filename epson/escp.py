@@ -1,19 +1,19 @@
-# 
+#
 #  Copyright (C) 2016, Jason S. McMullan <jason.mcmullan@gmail.com>
 #  All rights reserved.
-# 
+#
 #  Licensed under the MIT License:
-# 
+#
 #  Permission is hereby granted, free of charge, to any person obtaining
 #  a copy of this software and associated documentation files (the "Software"),
 #  to deal in the Software without restriction, including without limitation
 #  the rights to use, copy, modify, merge, publish, distribute, sublicense,
 #  and/or sell copies of the Software, and to permit persons to whom the
 #  Software is furnished to do so, subject to the following conditions:
-# 
+#
 #  The above copyright notice and this permission notice shall be included
 #  in all copies or substantial portions of the Software.
-# 
+#
 #  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 #  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 #  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -28,10 +28,13 @@ from __future__ import print_function
 
 import time
 import struct
+from typing import Optional
 from epson.constant import *
+from epson.raster import Image
+
 
 class Interface(object):
-    """ Base class for accessing EPSON ESC/P Raster printers """
+    """Base class for accessing EPSON ESC/P Raster printers"""
 
     # Exit packet mode
     ExitPacketMode = b"\000\000\000\033\001@EJL 1284.4\n@EJL     \n"
@@ -44,7 +47,7 @@ class Interface(object):
     ExitRemoteMode = b"\033\000\000\000"
 
     # Initialize time of day.
-    # data = YYYY(be16), MM(8), DD(8), hh(8), mm(8), ss(8) 
+    # data = YYYY(be16), MM(8), DD(8), hh(8), mm(8), ss(8)
     RemoteTimeInit = b"TI"
 
     # Mark start of job
@@ -72,76 +75,74 @@ class Interface(object):
     # Job End
     RemoteJobEnd = b"JE"
 
-    def __init__(self, io = None):
-        """ Initialize class """
+    def __init__(self, io=None):
+        """Initialize class"""
         self.io = io
         self.last_job = 0
-        pass
 
     def _send(self, msg):
         self.io.send(msg)
-        pass
 
-    def _recv(self, expected = 0):
-        return self.io.recv(expected = expected)
+    def _recv(self, expected=0):
+        return self.io.recv(expected=expected)
 
     """ Low-level command wrapper functions """
+
     def _exit_packet_mode(self):
         self._send(self.ExitPacketMode)
-        pass
 
     def _init_printer(self):
         self._send(self.InitPrinter)
-        pass
 
     def _form_feed(self):
-        self._send(byte(0xc))
+        self._send(byte(0xC))
 
     def _remote1_enter(self):
         self._send(self.EnterRemoteMode)
-        pass
 
-    def _remote1_cmd(self, cmd, data = b"", response = 0):
+    def _remote1_cmd(self, cmd, data=b"", response=0):
         self._send(cmd + struct.pack("<H", len(data) + 1) + byte(response) + data)
-        pass
 
     def _remote1_exit(self):
         self._send(self.ExitRemoteMode)
-        pass
 
     """ REMOTE1 Commands """
+
     def _time_init(self):
         now = time.localtime()
-        data = struct.pack(">HBBBBB", now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
+        data = struct.pack(
+            ">HBBBBB",
+            now.tm_year,
+            now.tm_mon,
+            now.tm_mday,
+            now.tm_hour,
+            now.tm_min,
+            now.tm_sec,
+        )
         self._remote1_cmd(self.RemoteTimeInit, data)
-        pass
 
-    def _job_start(self, name = None):
+    def _job_start(self, name=None):
         if name is None:
             data = b"\000\000\000"
         else:
             data = name.encode() + b"\000"
         self._remote1_cmd(self.RemoteJobStart, data)
-        pass
 
     def _job_end(self):
         self._remote1_cmd(self.RemoteJobEnd)
-        pass
 
-    def _job_header(self, job_type = 0, job_name = "ESCPPRLib", job_id = None):
+    def _job_header(self, job_type=0, job_name="ESCPPRLib", job_id=None):
         if job_id == None:
             job_id = self.last_job
         data = byte(job_type) + struct.pack(">L", job_id) + job_name.encode()
         self._remote1_cmd(self.RemoteJobHeader, data)
         self.last_job = job_id + 1
-        pass
 
-    def _hardware_device(self, platform = 4):
+    def _hardware_device(self, platform=4):
         data = b"\003" + byte(platform)
         self._remote1_cmd(self.RemoteHardwareDevice, data)
-        pass
 
-    def _paper_path(self, mpid = MPID.AUTO):
+    def _paper_path(self, mpid=MPID.AUTO):
         dst = 1
         src = 0
         if mpid == MPID.REAR:
@@ -168,52 +169,46 @@ class Interface(object):
         elif mpid == MPID.MANUAL:
             dst = 2
             src = 0
-        else: # mpid == MPID.AUTO, or any other
+        else:  # mpid == MPID.AUTO, or any other
             dst = 1
-            src = 0xff # Autoselect
+            src = 0xFF  # Autoselect
 
         data = byte(dst) + byte(src)
         self._remote1_cmd(self.RemotePaperPath, data)
-        pass
 
-    def _duplex(self, duplex = False):
+    def _duplex(self, duplex=False):
         if duplex:
             data = "\002"
             self._remote1_cmd(self.RemoteDuplexPath, data)
         else:
             self._remote1_cmd(self.RemoteLeaveDuplex)
-        pass
 
     """ Printing method control """
-    def _direction(self, pd = PD.BIDIREC):
-        self._send(b"\033U" + byte(pd))
-        pass
 
-    def _send_ext(self, code, data = None):
+    def _direction(self, pd=PD.BIDIREC):
+        self._send(b"\033U" + byte(pd))
+
+    def _send_ext(self, code, data=None):
         self._send(b"\033(" + code + struct.pack("<H", len(data)) + data)
-        pass
 
     def _graphics_mode(self):
         self._send_ext(b"G", struct.pack("<B", 1))
-        pass
 
-    def _color_mode(self, cm = CM.COLOR):
+    def _color_mode(self, cm=CM.COLOR):
         self._send_ext(b"K", struct.pack("<BB", 0, cm))
-        pass
 
-    def _image_resolution(self, h_dpi = 360, v_dpi = 120):
+    def _image_resolution(self, h_dpi=360, v_dpi=120):
         base = 1440
         v = base // h_dpi
         h = base // v_dpi
         data = struct.pack("<HBB", base, v, h)
         self._send_ext(b"D", data)
-        pass
 
-    def _set_unit(self, p_dpi = 360, h_dpi = 360, v_dpi = 360):
+    def _set_unit(self, p_dpi=360, h_dpi=360, v_dpi=360):
         base = max([p_dpi, h_dpi, v_dpi])
         if base == min([p_dpi, h_dpi, v_dpi]):
             # Use the non-extended version (since all DPIs are the same)
-            data = struct.pack("<B", 3600//p_dpi)
+            data = struct.pack("<B", 3600 // p_dpi)
             self._send_ext(b"U", data)
         else:
             # Use the extended version (for differing DPIs)
@@ -222,10 +217,9 @@ class Interface(object):
             v = base // v_dpi
             data = struct.pack("<BBBH", p, v, h, base)
             self._send_ext(b"U", data)
-        pass
 
-    def _page_format(self, msid = MSID.LETTER, margin = (0, 0, 0, 0), dpi = 360):
-        mm2in = 1.0/25.4
+    def _page_format(self, msid=MSID.LETTER, margin=(0, 0, 0, 0), dpi=360):
+        mm2in = 1.0 / 25.4
         y_top = int(margin[1] * mm2in * dpi)
         y_bottom = int((msid[1] - margin[3]) * mm2in * dpi)
         x_left = int(margin[0] * mm2in * dpi)
@@ -235,45 +229,45 @@ class Interface(object):
 
         return (x_right - x_left, y_bottom - y_top)
 
-    def _dot_size(self, dpi = 360):
+    def _dot_size(self, dpi=360):
         # FIXME: Determine the correct dot size
         # dot_size = ??
         # self._send_ext(b"e", struct.pack("<BB", 0, dot_size))
         pass
 
-    def _vertical_position(self, y = 0):
+    def _vertical_position(self, y=0):
         data = struct.pack("<L", y)
         self._send_ext(b"V", data)
-        pass
 
-    def _vertical_increment(self, y = 0):
+    def _vertical_increment(self, y=0):
         data = struct.pack("<L", y)
         self._send_ext(b"v", data)
-        pass
 
-    def _horizontal_position(self, x = 0):
+    def _horizontal_position(self, x=0):
         data = struct.pack("<L", x)
         self._send_ext(b"$", data)
-        pass
 
-    def _horizontal_increment(self, x = 0):
+    def _horizontal_increment(self, x=0):
         data = struct.pack("<L", x)
         self._send_ext(b"/", data)
-        pass
 
-    def _paper_dimension(self, msid = (0, 0), dpi = 360):
-        mm2in = 1.0/25.4
-        width = msid[0] * mm2in * dpi
-        height= msid[1] * mm2in * dpi
+    def _paper_dimension(self, msid=(0, 0), dpi=360):
+        mm2in = 1.0 / 25.4
+        width = int(round(msid[0] * mm2in * dpi))
+        height = int(round(msid[1] * mm2in * dpi))
         data = struct.pack("<LL", width, height)
         self._send_ext(b"S", data)
-        pass
 
-    def _print_method(self, method = 0x12):
+    def _print_method(self, method=0x12):
         self._send_ext(b"m", struct.pack("<B", method))
-        pass
 
-    def _send_line(self, color = CI.BLACK, line = None, bpp = 1, compressed = True):
+    def _send_line(
+        self,
+        color=CI.BLACK,
+        line: Optional[bytes] = None,
+        bpp=1,
+        compressed=True,
+    ):
         if line is None or len(line) == 0:
             return
 
@@ -282,21 +276,20 @@ class Interface(object):
         else:
             cmode = 0
 
-        data = struct.pack("<BBBHH", color, cmode, bpp,
-                           len(line), 1)
+        data = struct.pack("<BBBHH", color, cmode, bpp, len(line), 1)
         if compressed:
-            data += RunLengthEncode(line = line, bytes_per_pixel = 1);
+            data += run_length_encode(line, bytes_per_pixel=1)
         else:
             data += line
 
         self._send(b"\033i" + data)
-        pass
-                            
-class Job(Interface):
-    """ EPSON ESC/P 'ESC ( D' Job Wrapper """
 
-    def __init__(self, io = None, name = "ESCPLib"):
-        super(Job, self).__init__(io = io)
+
+class Job(Interface):
+    """EPSON ESC/P 'ESC ( D' Job Wrapper"""
+
+    def __init__(self, io=None, name="ESCPLib"):
+        super(Job, self).__init__(io=io)
 
         # Job name
         self.name = name
@@ -329,16 +322,20 @@ class Job(Interface):
         self.mtid = MTID.PLAIN
         self.msid = MSID.LETTER
         self.mlid = MLID.BORDERS
-        self.margin = (3, 3, 3, 3) # 3mm borders
+        self.margin = (3, 3, 3, 3)  # 3mm borders
 
         # CD Label size
         self.cddim_id = None
         self.cddim_od = None
 
-    def _start(self, copies = 1):
-        if self.mtid == MTID.CDDVD or self.mtid == MTID.CDDVDHIGH or self.mtid == MTID.CDDVDGLOSSY:
-           self.mpid = MPID.CDTRAY
-           self.mlid = MLID.CDLABEL
+    def _start(self, copies=1):
+        if (
+            self.mtid == MTID.CDDVD
+            or self.mtid == MTID.CDDVDHIGH
+            or self.mtid == MTID.CDDVDGLOSSY
+        ):
+            self.mpid = MPID.CDTRAY
+            self.mlid = MLID.CDLABEL
 
         self._exit_packet_mode()
 
@@ -346,7 +343,7 @@ class Job(Interface):
         self._remote1_enter()
         self._time_init()
         self._job_start()
-        self._job_header(job_name = self.name)
+        self._job_header(job_name=self.name)
         self._hardware_device()
 
         self._paper_path(self.mpid)
@@ -356,19 +353,19 @@ class Job(Interface):
 
         # ESC/P setup commands
         self._init_printer()
-        self._graphics_mode()                           # \e(G
-        self._set_unit(self.dpi, self.dpi, self.dpi)    # \e(U
+        self._graphics_mode()  # \e(G
+        self._set_unit(self.dpi, self.dpi, self.dpi)  # \e(U
 
         # ESC/P printing method
-        self._direction(pd = self.pd)                   # \eU
-        self._color_mode(cm = self.cm)                  # \e(K
-        self._dot_size(self.dpi)                        # \e(e
-        self._image_resolution()                        # \e(D
+        self._direction(pd=self.pd)  # \eU
+        self._color_mode(cm=self.cm)  # \e(K
+        self._dot_size(self.dpi)  # \e(e
+        self._image_resolution()  # \e(D
 
         # ESC/P set print format
-        size = self._page_format(msid = self.msid, margin = self.margin, dpi = self.dpi)
-        self._paper_dimension(msid = self.msid)         # \e(S
-        self._print_method()                            # \e(m
+        size = self._page_format(msid=self.msid, margin=self.margin, dpi=self.dpi)
+        self._paper_dimension(msid=self.msid)  # \e(S
+        self._print_method()  # \e(m
 
         return size
 
@@ -382,31 +379,27 @@ class Job(Interface):
         self._job_end()
         self._remote1_exit()
 
-    def print_pages(self, rasters = None, bpp = 1):
-
+    def print_pages(self, rasters: list[Image], bpp: int = 1):
         size = self._start()
-        mm2in = 1.0/25.4
+        mm2in = 1.0 / 25.4
 
         delta_x = int(self.margin[0] * mm2in * self.dpi)
         delta_y = int(self.margin[1] * mm2in * self.dpi)
 
         for raster in rasters:
 
-            self._vertical_position(y = delta_y)
+            self._vertical_position(y=delta_y)
             for y in range(0, min(size[1], raster.size[1])):
-                for color in range(0,4):
-                    line = raster.bitline(y = y, ci = color, bpp = bpp)
-                    self._horizontal_position(x = delta_x)
-                    self._send_line(line = line, bpp = bpp)
+                for color in range(0, 4):
+                    line = raster.bitline(y=y, ci=color, bpp=bpp)
+                    self._horizontal_position(x=delta_x)
+                    self._send_line(line=line, bpp=bpp)
 
-                self._vertical_increment(y = 1)
-            pass
+                self._vertical_increment(y=1)
 
             self._form_feed()
-        pass
 
         self._end()
-        pass
 
 
-#  vim: set shiftwidth=4 expandtab: # 
+#  vim: set shiftwidth=4 expandtab: #

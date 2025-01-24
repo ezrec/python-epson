@@ -26,9 +26,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
-import sys
-import time
 import math
 import struct
 import epson
@@ -47,7 +44,6 @@ class Interface(epson.escp.Interface):
     def __init__(self, io = None):
         """ Initialize class """
         super(Interface, self).__init__(io = io)
-        pass
 
     """ ESC/P Raster Mode """
     def _raster_enter(self, jpeg = False):
@@ -56,7 +52,6 @@ class Interface(epson.escp.Interface):
         else:
             self._send(self.ESCPRMode)
 
-        pass
 
     """ Raster Mode command wrappers """
     def _raster_cmd(self, cmd, code, data = None):
@@ -79,7 +74,6 @@ class Interface(epson.escp.Interface):
                  palette
                )
         self._raster_cmd(b"q", b"setq", data)
-        pass
 
     def _raster_check(self):
         # Only needed on 'version 3' or higher printers?
@@ -123,12 +117,10 @@ class Interface(epson.escp.Interface):
     def _jpeg_auto_photo_fix(self, cm = CM.COLOR, act = ACT.NOTHING, sharpness = 0, rde = RDE.NOTHING):
         data = byte(cm) + byte(act) + byte(clamp(-50, sharpness, 50)) + byte(rde)
         self._raster_cmd(b"a", b"seta", data)
-        pass
 
     def _jpeg_copies(self, copies = 1):
         data = byte(clamp(1, copies, 255))
         self._raster_cmd(b"c", b"setc", data)
-        pass
 
     def _jpeg_job(self):
         # TODO: Add JPEG page size support
@@ -157,16 +149,13 @@ class Interface(epson.escp.Interface):
         data += byte(clamp(114, cddim_od, 120))
         date += byte(pd)
 
-        self,_raster_cmd(b"j", b"sets", data)
-        pass
+        self._raster_cmd(b"j", b"sets", data)
 
     def _raster_start_page(self):
         self._raster_cmd(b"p", b"sttp")
-        pass
 
     def _raster_printnum2(self, pageno = 1):
         self._raster_cmd(b"p",b"setn",byte(pageno))
-        pass
 
     def _send_jpeg(self, chunk):
         while len(chunk) > 0:
@@ -175,12 +164,10 @@ class Interface(epson.escp.Interface):
                 size = 0xffff
             self._raster_cmd(b"d",b"jsnd", struct.pack(">H", size) + chunk[0:size])
             chunk = chunk[size:]
-            pass
-        pass
 
     def _send_line(self, line = None, offset = (0, 0), compress = False):
         if compress:
-            line = epson.escpr.RunLengthEncode(line, 3)
+            line = epson.escpr.run_length_encode(line, 3)
             cmode = 1
         else:
             cmode = 0
@@ -188,11 +175,9 @@ class Interface(epson.escp.Interface):
         data = struct.pack(">HHBH",  offset[0], offset[1], cmode, len(line))
 
         self._raster_cmd(b"d",b"dsnd", data + line)
-        pass
 
     def _raster_endpage(self, pages_remaining = 0):
         self._raster_cmd(b"p", b"endp", byte(pages_remaining))
-        pass
 
     def _raster_endjob(self):
         self._raster_cmd(b"j", b"endj")
@@ -299,7 +284,6 @@ class Job(Interface):
                              pd = self.pd,
                              cddim_id = self.cddim_id,
                              cddim_od = self.cddim_od)
-            pass
 
         return size
 
@@ -335,10 +319,8 @@ class Job(Interface):
             if rpage > 99:
                 rpage = 99
             self._raster_endpage(pages_remaining = rpage)
-            pass
 
         self._end()
-        pass
 
 
 #  vim: set shiftwidth=4 expandtab: # 
