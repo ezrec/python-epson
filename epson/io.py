@@ -27,9 +27,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 import io
 import sys
+from socket import socket as Socket, AF_INET, SOCK_STREAM
+
 import usb.core
 
 
@@ -122,3 +123,26 @@ def Usb(Io):
 
     def send(self, data):
         self.device.write(self.out_ep, data, self.interface)
+
+
+class Network:
+    """EPSON Network Transport."""
+
+    _socket: Socket
+
+    def __init__(self, host: str, port: int = 9100):
+        self._socket = Socket(AF_INET, SOCK_STREAM)
+        self._host = host
+        self._port = port
+
+    def open(self):
+        self._socket.connect((self._host, self._port))
+
+    def close(self):
+        self._socket.close()
+
+    def send(self, data=None):
+        self._socket.sendall(data)
+
+    def recv(self, expected=None):
+        return None
