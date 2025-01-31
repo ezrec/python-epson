@@ -186,8 +186,18 @@ def escp_read(fin=None):
                 protocol = "remote1"
             elif data == b"ESCPR" or data == b"ESCPRJ":
                 protocol = "escpr"
-        elif ecode == b"v":  # Vertical offset
-            (escp["offset"],) = struct.unpack("<L", data)
+
+        elif ecode == b"v":
+            # Set absolute vertical print position.
+            if elen == 2:
+                # Version 1.00.
+                (escp["offset"],) = struct.unpack("<H", data)
+            elif elen == 4:
+                # Version 2.00. Extended.
+                (escp["offset"],) = struct.unpack("<L", data)
+            else:
+                raise ValueError(f"Incorrect parameters size '{elen}'.")
+
         elif ecode == b"/":  # Horizontal offset
             (escp["offset"],) = struct.unpack("<L", data)
         else:
