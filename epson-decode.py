@@ -63,9 +63,9 @@ def escp_read(fin=None):
             return None
 
         (clen,) = struct.unpack("<H", fin.read(2))
-        if code == b"\033\000" and clen == 0:
+        if code == b"\x1b\x00" and clen == 0:
             protocol = "escp"
-            return {"type": protocol, "code": b"\000", "data": b"\000\000"}
+            return {"type": protocol, "code": b"\x00", "data": b"\x00\x00"}
 
         (cres,) = struct.unpack("<B", fin.read(1))
         data = fin.read(clen - 1)
@@ -82,7 +82,7 @@ def escp_read(fin=None):
     if len(ch) < 1:
         return None
 
-    if ch != b"\033":
+    if ch != b"\x1b":
         return {"type": "char", "char": ch}
 
     if protocol == "escpr":
@@ -150,7 +150,7 @@ def escp_read(fin=None):
     code = fin.read(1)
     escp = {"type": protocol, "code": code}
 
-    if code == b"\001":  # Exit packet mode
+    if code == b"\x01":  # Exit packet mode
         data = b""
         nl = 0
         while True:

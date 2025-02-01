@@ -39,9 +39,9 @@ class Interface(epson.escp.Interface):
     """Base class for accessing EPSON ESC/P Raster printers"""
 
     # ESC/P-R mode
-    ESCPRMode = b"\033(R\006\000\000ESCPR"
+    ESCPRMode = b"\x1b(R\x06\x00\x00ESCPR"
     # ESC/P-R JPEG mode
-    ESCPRModeJpg = b"\033(R\007\000\000ESCPRJ"
+    ESCPRModeJpg = b"\x1b(R\x07\x00\x00ESCPRJ"
 
     def __init__(self, io=None):
         """Initialize class"""
@@ -60,7 +60,7 @@ class Interface(epson.escp.Interface):
     def _raster_cmd(self, cmd, code, data=None):
         if data is None:
             data = b""
-        self._send(b"\033" + cmd + struct.pack("<L", len(data)) + code + data)
+        self._send(b"\x1b" + cmd + struct.pack("<L", len(data)) + code + data)
 
     def _raster_quality(
         self,
@@ -91,7 +91,7 @@ class Interface(epson.escp.Interface):
 
     def _raster_check(self):
         # Only needed on 'version 3' or higher printers?
-        # self._raster_cmd("u", "chku", "\001\001")
+        # self._raster_cmd("u", "chku", "\x01\x01")
         pass
 
     def _raster_job(
