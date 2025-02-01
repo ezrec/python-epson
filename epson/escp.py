@@ -38,14 +38,14 @@ class Interface(object):
     """Base class for accessing EPSON ESC/P Raster printers"""
 
     # Exit packet mode
-    ExitPacketMode = b"\000\000\000\033\001@EJL 1284.4\n@EJL     \n"
+    ExitPacketMode = b"\x00\x00\x00\x1b\x01@EJL 1284.4\n@EJL     \n"
     # Initilaize printer
-    InitPrinter = b"\033@"
+    InitPrinter = b"\x1b@"
 
     # REMOTE1 protocol commands
     # Enter remote mode
-    EnterRemoteMode = b"\033(R\010\000\000REMOTE1"
-    ExitRemoteMode = b"\033\000\000\000"
+    EnterRemoteMode = b"\x1b(R\x08\x00\x00REMOTE1"
+    ExitRemoteMode = b"\x1b\x00\x00\x00"
 
     # Initialize time of day.
     # data = YYYY(be16), MM(8), DD(8), hh(8), mm(8), ss(8)
@@ -124,9 +124,9 @@ class Interface(object):
 
     def _job_start(self, name=None):
         if name is None:
-            data = b"\000\000\000"
+            data = b"\x00\x00\x00"
         else:
-            data = name.encode() + b"\000"
+            data = name.encode() + b"\x00"
         self._remote1_cmd(self.RemoteJobStart, data)
 
     def _job_end(self):
@@ -140,7 +140,7 @@ class Interface(object):
         self.last_job = job_id + 1
 
     def _hardware_device(self, platform=4):
-        data = b"\003" + byte(platform)
+        data = b"\x03" + byte(platform)
         self._remote1_cmd(self.RemoteHardwareDevice, data)
 
     def _paper_path(self, mpid=MPID.AUTO):
@@ -179,7 +179,7 @@ class Interface(object):
 
     def _duplex(self, duplex=False):
         if duplex:
-            data = "\002"
+            data = "\x02"
             self._remote1_cmd(self.RemoteDuplexPath, data)
         else:
             self._remote1_cmd(self.RemoteLeaveDuplex)
@@ -187,10 +187,10 @@ class Interface(object):
     """ Printing method control """
 
     def _direction(self, pd=PD.BIDIREC):
-        self._send(b"\033U" + byte(pd))
+        self._send(b"\x1bU" + byte(pd))
 
     def _send_ext(self, code, data=None):
-        self._send(b"\033(" + code + struct.pack("<H", len(data)) + data)
+        self._send(b"\x1b(" + code + struct.pack("<H", len(data)) + data)
 
     def _graphics_mode(self):
         self._send_ext(b"G", struct.pack("<B", 1))
@@ -283,7 +283,7 @@ class Interface(object):
         else:
             data += line
 
-        self._send(b"\033i" + data)
+        self._send(b"\x1bi" + data)
 
 
 class Job(Interface):
@@ -354,19 +354,19 @@ class Job(Interface):
 
         # ESC/P setup commands
         self._init_printer()
-        self._graphics_mode()  # \e(G
-        self._set_unit(self.dpi, self.dpi, self.dpi)  # \e(U
+        self._graphics_mode()  # ESC (G
+        self._set_unit(self.dpi, self.dpi, self.dpi)  # ESC (U
 
         # ESC/P printing method
-        self._direction(pd=self.pd)  # \eU
-        self._color_mode(cm=self.cm)  # \e(K
-        self._dot_size(self.dpi)  # \e(e
-        self._image_resolution()  # \e(D
+        self._direction(pd=self.pd)  # ESC U
+        self._color_mode(cm=self.cm)  # ESC (K
+        self._dot_size(self.dpi)  # ESC (e
+        self._image_resolution()  # ESC (D
 
         # ESC/P set print format
         size = self._page_format(msid=self.msid, margin=self.margin, dpi=self.dpi)
-        self._paper_dimension(msid=self.msid)  # \e(S
-        self._print_method()  # \e(m
+        self._paper_dimension(msid=self.msid)  # ESC (S
+        self._print_method()  # ESC (m
 
         return size
 
