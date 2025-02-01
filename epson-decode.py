@@ -163,6 +163,12 @@ def escp_read(fin=None):
                     break
     elif code == b"@":  # Init printer
         pass
+
+    elif code == b"U":
+        # Set unidirectional mode.
+        on_off = fin.read(1)
+        escp["unidirectional_mode"] = on_off
+
     elif code == b"i":  # Raster data
         spec = fin.read(7)
         color, cmode, bpp, bwidth, lines = struct.unpack("<BBBHH", spec)
@@ -178,6 +184,7 @@ def escp_read(fin=None):
         (elen,) = struct.unpack("<H", fin.read(2))
         data = fin.read(elen)
         escp["extended"] = ecode
+
         if ecode == b"R":
             escp["response"] = data[0]
             data = data[1:]
@@ -187,8 +194,24 @@ def escp_read(fin=None):
             elif data == b"ESCPR" or data == b"ESCPRJ":
                 protocol = "escpr"
 
-        elif ecode == b"v":
+        elif ecode == b"$":
+            # Set absolute horizontal position.
+            assert elen == 4
+            (escp["position"],) = struct.unpack("<L", data)
+
+        elif ecode == b"V":
             # Set absolute vertical print position.
+            if elen == 2:
+                # Version 1.00.
+                (escp["position"],) = struct.unpack("<H", data)
+            elif elen == 4:
+                # Version 2.00. Extended.
+                (escp["position"],) = struct.unpack("<L", data)
+            else:
+                raise ValueError(f"Incorrect parameters size '{elen}'.")
+
+        elif ecode == b"v":
+            # Set relative vertical print position.
             if elen == 2:
                 # Version 1.00.
                 (escp["offset"],) = struct.unpack("<H", data)
@@ -198,8 +221,55 @@ def escp_read(fin=None):
             else:
                 raise ValueError(f"Incorrect parameters size '{elen}'.")
 
-        elif ecode == b"/":  # Horizontal offset
+        elif ecode == b"/":
+            # Set horizontal offset.
             (escp["offset"],) = struct.unpack("<L", data)
+
+        elif ecode == b"c":
+            # Set page format.
+            if elen == 4:
+                (escp["t"],) = struct.unpack("<H", data[0:2])
+                (escp["b"],) = struct.unpack("<H", data[2:4])
+            elif elen == 8:
+                (escp["t"],) = struct.unpack("<L", data[0:4])
+                (escp["b"],) = struct.unpack("<L", data[4:8])
+            else:
+                raise ValueError(f"Unexpected number of parameters '{elen}'.")
+
+        elif ecode == b"S":
+            # Set paper dimensions.
+            assert elen == 8
+            (escp["w"],) = struct.unpack("<L", data[0:4])
+            (escp["l"],) = struct.unpack("<L", data[4:8])
+
+        elif ecode == b"m":
+            # Set print method.
+            assert elen == 1
+            (escp["print_method"],) = struct.unpack("B", data)
+
+        elif ecode == b"D":
+            # Set raster resolution.
+            assert elen == 4
+
+            (escp["r"],) = struct.unpack("<H", data[0:2])
+            (escp["v"],) = struct.unpack("B", data[2:3])
+            (escp["h"],) = struct.unpack("B", data[3:4])
+
+            escp["resolution"] = f"{escp['r']//escp['v']}x{escp['r']//escp['h']} DPI"
+
+        elif ecode == b"K":
+            # Set Color Mode.
+            # 0: Default, 1: Monochrome, 2: Color.
+            # NOTE: For some reason the parameter count is defined as 1, but the
+            # command actually has two bytes of data.
+            if elen == 1:
+                assert data == b"\x00"
+                data = fin.read(1)
+                (escp["color_mode"],) = struct.unpack("B", fin.read(1))
+            else:
+                assert elen == 2
+                (escp["color_mode"],) = struct.unpack("B", data[1:2])
+
         else:
             escp["data"] = data
 
