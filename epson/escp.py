@@ -70,8 +70,9 @@ class Interface(object):
     # DuplexPath
     # data = 2
     RemoteDuplexPath = b"DP"
-    # No data
-    RemoteLeaveDuplex = b"LD"
+
+    # Load default values from NVR.
+    RemoteLoadDefault = b"LD"
 
     # Job End
     RemoteJobEnd = b"JE"
@@ -95,8 +96,17 @@ class Interface(object):
     def _init_printer(self):
         self._send(self.InitPrinter)
 
+    def _line_feed(self):
+        """Set print position to next line."""
+        self._send(b"\x0a")
+
     def _form_feed(self):
-        self._send(byte(0xC))
+        """Print buffer is printed. Page is ejected. Print position is reset."""
+        self._send(b"\x0c")
+
+    def _carriage_return(self):
+        """Reset print position to beginning of current line."""
+        self._send(b"\x0d")
 
     def _remote1_enter(self):
         self._send(self.EnterRemoteMode)
@@ -181,8 +191,9 @@ class Interface(object):
         if duplex:
             data = "\x02"
             self._remote1_cmd(self.RemoteDuplexPath, data)
-        else:
-            self._remote1_cmd(self.RemoteLeaveDuplex)
+
+    def _load_defaults(self):
+        self._remote1_cmd(self.RemoteLoadDefault)
 
     """ Printing method control """
 
@@ -192,16 +203,20 @@ class Interface(object):
     def _send_ext(self, code, data=None):
         self._send(b"\x1b(" + code + struct.pack("<H", len(data)) + data)
 
-    def _graphics_mode(self):
-        self._send_ext(b"G", struct.pack("<B", 1))
+    def _graphics_mode(self, mode: int = 1):
+        self._send_ext(b"G", struct.pack("B", mode))
 
     def _color_mode(self, cm=CM.COLOR):
-        self._send_ext(b"K", struct.pack("<BB", 0, cm))
+        self._send_ext(b"K", struct.pack("BB", 0, cm))
+
+    def _set_microweave(self, mode: int = 1):
+        self._send_ext(b"i", struct.pack("B", mode))
 
     def _image_resolution(self, h_dpi=360, v_dpi=120):
         base = 1440
         v = base // h_dpi
         h = base // v_dpi
+
         data = struct.pack("<HBB", base, v, h)
         self._send_ext(b"D", data)
 
@@ -209,58 +224,106 @@ class Interface(object):
         base = max([p_dpi, h_dpi, v_dpi])
         if base == min([p_dpi, h_dpi, v_dpi]):
             # Use the non-extended version (since all DPIs are the same)
-            data = struct.pack("<B", 3600 // p_dpi)
+            data = struct.pack("B", 3600 // p_dpi)
             self._send_ext(b"U", data)
         else:
             # Use the extended version (for differing DPIs)
             p = base // p_dpi
-            h = base // h_dpi
             v = base // v_dpi
+            h = base // h_dpi
             data = struct.pack("<BBBH", p, v, h, base)
             self._send_ext(b"U", data)
 
-    def _page_format(self, msid=MSID.LETTER, margin=(0, 0, 0, 0), dpi=360):
+    def _page_format(
+        self,
+        msid=MSID.LETTER,
+        margin=(0, 0, 0, 0),
+        dpi: int = 360,
+        version: int = 2,
+    ):
         mm2in = 1.0 / 25.4
         y_top = int(margin[1] * mm2in * dpi)
         y_bottom = int((msid[1] - margin[3]) * mm2in * dpi)
         x_left = int(margin[0] * mm2in * dpi)
         x_right = int(margin[2] * mm2in * dpi)
-        data = struct.pack("<LL", y_top, y_bottom)
-        self._send_ext(b"c", data)
+
+        if version == 1:
+            self._send_ext(b"c", struct.pack("<HH", y_top, y_bottom))
+        elif version == 2:
+            self._send_ext(b"c", struct.pack("<LL", y_top, y_bottom))
+        else:
+            raise Exception(f"Unknown version '{version}'.")
 
         return (x_right - x_left, y_bottom - y_top)
 
-    def _dot_size(self, dpi=360):
-        # FIXME: Determine the correct dot size
-        # dot_size = ??
-        # self._send_ext(b"e", struct.pack("<BB", 0, dot_size))
-        pass
+    def _dot_size(self, dot_size):
+        self._send_ext(b"e", struct.pack("BB", 0, dot_size))
 
-    def _vertical_position(self, y=0):
-        data = struct.pack("<L", y)
-        self._send_ext(b"V", data)
+    def _vertical_position(self, y: int = 0, version: int = 2):
+        """Set absolute vertical print position."""
+        if version == 1:
+            self._send_ext(b"V", struct.pack("<H", y))
+        elif version == 2:
+            self._send_ext(b"V", struct.pack("<L", y))
+        else:
+            raise Exception(f"Unknown version '{version}'.")
 
-    def _vertical_increment(self, y=0):
-        data = struct.pack("<L", y)
-        self._send_ext(b"v", data)
+    def _vertical_increment(self, y: int = 0, version: int = 2):
+        """Set relative vertical print position."""
+        if version == 1:
+            self._send_ext(b"v", struct.pack("<H", y))
+        elif version == 2:
+            self._send_ext(b"v", struct.pack("<L", y))
+        else:
+            raise Exception(f"Unknown version '{version}'.")
 
-    def _horizontal_position(self, x=0):
-        data = struct.pack("<L", x)
-        self._send_ext(b"$", data)
+    def _horizontal_position(self, x: int = 0, version: int = 2):
+        """Set absolute horizontal print position."""
+        if version == 1:
+            self._send(b"\x1b$" + struct.pack("<H", x))
+        elif version == 2:
+            self._send_ext(b"$", struct.pack("<L", x))
+        else:
+            raise Exception(f"Unknown version '{version}'.")
 
-    def _horizontal_increment(self, x=0):
-        data = struct.pack("<L", x)
-        self._send_ext(b"/", data)
+    def _horizontal_increment(self, x: int = 0, version: int = 2):
+        """Set relative horizontal print position."""
+        if version == 1:
+            self._send(b"\x1b\\" + struct.pack("<H", x))
+        elif version == 2:
+            self._send_ext(b"/", struct.pack("<L", x))
+        else:
+            raise Exception(f"Unknown version '{version}'.")
+
+    def _set_page_length(self, length: int = 0, version: int = 2):
+        if version == 1:
+            self._send_ext(b"C", struct.pack("<H", length))
+        elif version == 2:
+            self._send_ext(b"C", struct.pack("<L", length))
+        else:
+            raise Exception(f"Unknown version '{version}'.")
 
     def _paper_dimension(self, msid=(0, 0), dpi=360):
         mm2in = 1.0 / 25.4
         width = int(round(msid[0] * mm2in * dpi))
         height = int(round(msid[1] * mm2in * dpi))
+
         data = struct.pack("<LL", width, height)
         self._send_ext(b"S", data)
 
     def _print_method(self, method=0x12):
-        self._send_ext(b"m", struct.pack("<B", method))
+        self._send_ext(b"m", struct.pack("B", method))
+
+    def _set_color(self, color=0x00, version: int = 2):
+        if version == 1:
+            self._send(b"\x1br" + struct.pack("B", color))
+        elif version == 2:
+            m = 0
+            self._send_ext(b"r", struct.pack("BB", m, color))
+        else:
+            raise Exception(f"Unknown version '{version}'.")
+
+    # TODO: Add ESC . and ESC . 2 raster modes.
 
     def _send_line(
         self,
@@ -353,18 +416,29 @@ class Job(Interface):
         self._remote1_exit()
 
         # ESC/P setup commands
-        self._init_printer()
+        self._init_printer()  # ESC @
+        # TODO: ESC (A ?
         self._graphics_mode()  # ESC (G
         self._set_unit(self.dpi, self.dpi, self.dpi)  # ESC (U
 
         # ESC/P printing method
         self._direction(pd=self.pd)  # ESC U
+        # TODO: ?
+        # self._set_microweave()  # ESC (A
         self._color_mode(cm=self.cm)  # ESC (K
-        self._dot_size(self.dpi)  # ESC (e
+        # TODO:
+        # self._dot_size()  # ESC (e
+
+        # ESC (D is used for "new style" raster, with ESC i.
+        # For "old style" raster, with ESC ., it is omitted.
         self._image_resolution()  # ESC (D
 
         # ESC/P set print format
-        size = self._page_format(msid=self.msid, margin=self.margin, dpi=self.dpi)
+        # TODO: ?
+        # self._set_page_length()  # ESC (C
+        size = self._page_format(
+            msid=self.msid, margin=self.margin, dpi=self.dpi
+        )  # ESC (c
         self._paper_dimension(msid=self.msid)  # ESC (S
         self._print_method()  # ESC (m
 
@@ -374,10 +448,10 @@ class Job(Interface):
         self._init_printer()
 
         self._remote1_enter()
-        if self.duplex:
-            self._duplex(False)
 
+        self._load_defaults()
         self._job_end()
+
         self._remote1_exit()
 
     def print_pages(self, rasters: list[Image], bpp: int = 1):

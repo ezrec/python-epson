@@ -290,13 +290,13 @@ class Quality(ValueEnum):
 MQID = Quality  # Alias.
 
 
-class ColorSpace(ValueEnum):
+class ColorMode(ValueEnum):
     COLOR = 0
     MONOCHROME = 1
     SEPIA = 2
 
 
-CM = ColorSpace  # Alias.
+CM = ColorMode  # Alias.
 
 
 class ColorPalette(ValueEnum):
