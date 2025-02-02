@@ -283,7 +283,7 @@ class Job(Interface):
         self._remote1_exit()
 
         # ESC/P Raster commands
-        self._raster_enter(jpeg=self.cp == CP.JPEG)
+        self._raster_enter(jpeg=(self.cp == CP.JPEG))
 
         self._raster_quality(
             mtid=self.mtid,
@@ -337,10 +337,10 @@ class Job(Interface):
         self._init_printer()
 
         self._remote1_enter()
-        if self.duplex:
-            self._duplex(False)
 
+        self._load_defaults()
         self._job_end()
+
         self._remote1_exit()
 
     def print_pages(self, rasters=None, copies=1):
