@@ -82,6 +82,15 @@ def escp_read(fin=None):
     if len(ch) < 1:
         return None
 
+    if ch == b"\x0a":
+        return {"type": "special", "name": "Line Feed"}
+
+    if ch == b"\x0c":
+        return {"type": "special", "name": "Form Feed"}
+
+    if ch == b"\x0d":
+        return {"type": "special", "name": "Carriage Return"}
+
     if ch != b"\x1b":
         return {"type": "char", "char": ch}
 
@@ -99,6 +108,7 @@ def escp_read(fin=None):
                 escpr["compress"] = cmode
                 escpr["x"] = left
                 escpr["y"] = top
+
         elif rclass == b"j":
             if rcode == b"endj":
                 protocol = "escp"
@@ -125,6 +135,7 @@ def escp_read(fin=None):
                 escpr["dpi"] = dpi
                 escpr["pd"] = pd
                 rdata = None
+
         elif rclass == b"q":
             if rcode == b"setq":
                 mtid, mqid, cm, brightness, contrast, saturation, cp, plen = (
@@ -150,7 +161,8 @@ def escp_read(fin=None):
     code = fin.read(1)
     escp = {"type": protocol, "code": code}
 
-    if code == b"\x01":  # Exit packet mode
+    if code == b"\x01":
+        # Exit packet mode.
         data = b""
         nl = 0
         while True:
@@ -161,15 +173,17 @@ def escp_read(fin=None):
                 if nl == 2:
                     escp["data"] = data
                     break
-    elif code == b"@":  # Init printer
+
+    elif code == b"@":
+        # Init printer.
         pass
 
     elif code == b"U":
         # Set unidirectional mode.
-        on_off = fin.read(1)
-        escp["unidirectional_mode"] = on_off
+        (escp["unidirectional_mode"],) = struct.unpack("B", fin.read(1))
 
-    elif code == b"i":  # Raster data
+    elif code == b"i":
+        # Raster data.
         spec = fin.read(7)
         color, cmode, bpp, bwidth, lines = struct.unpack("<BBBHH", spec)
         data = rle_read(fin, bwidth, cmode)
@@ -179,13 +193,55 @@ def escp_read(fin=None):
         escp["width"] = int(bwidth / bpp * 8)
         escp["height"] = lines
         escp["raster"] = data
+
+    elif code == b".":
+        # Raster data.
+        (escp["c"],) = struct.unpack("B", fin.read(1))
+        (escp["v"],) = struct.unpack("B", fin.read(1))
+        (escp["h"],) = struct.unpack("B", fin.read(1))
+        (escp["m"],) = struct.unpack("B", fin.read(1))
+        (escp["nL"],) = struct.unpack("B", fin.read(1))
+        (escp["nH"],) = struct.unpack("B", fin.read(1))
+
+        k = escp["m"] * int((escp["nH"] * 256 + escp["nL"] + 7) / 8)
+
+        if escp["c"] == 0:
+            escp["d"] = fin.read(k)
+
+        elif escp["c"] == 1:
+            escp["d"] = b""
+            while len(escp["d"]) < k:
+                (counter,) = struct.unpack("B", fin.read(1))
+                # Counter specifies the number of data bytes following.
+                if counter <= 127:
+                    escp["d"] += fin.read(counter + 1)
+                # Counter specifies the number of times to repeat the next byte of data.
+                if counter >= 128:
+                    escp["d"] += fin.read(1) * (256 - counter + 1)
+
+        else:
+            raise Exception()
+
+    elif code == b"r":
+        # Set color.
+        # 0: Black, 1: Magenta, 2: Cyan, 4: Yellow.
+        (escp["color"],) = struct.unpack("B", fin.read(1))
+
     elif code == b"(":  # Extended
         ecode = fin.read(1)
         (elen,) = struct.unpack("<H", fin.read(2))
         data = fin.read(elen)
         escp["extended"] = ecode
 
-        if ecode == b"R":
+        if ecode == b"G":
+            # Set graphics mode.
+            (escp["mode"],) = struct.unpack("B", data)
+
+        elif ecode == b"i":
+            # Set MicroWeave mode.
+            (escp["mode"],) = struct.unpack("B", data)
+
+        elif ecode == b"R":
             escp["response"] = data[0]
             data = data[1:]
             escp["protocol"] = data
@@ -198,6 +254,20 @@ def escp_read(fin=None):
             # Set absolute horizontal position.
             assert elen == 4
             (escp["position"],) = struct.unpack("<L", data)
+
+        elif ecode == b"U":
+            # Set unit.
+            if elen == 1:
+                # Version 1.00.
+                (escp["unit"],) = struct.unpack("B", data)
+            elif elen == 5:
+                # Version 2.00. Extended.
+                (escp["p"],) = struct.unpack("B", data[0:1])
+                (escp["v"],) = struct.unpack("B", data[1:2])
+                (escp["h"],) = struct.unpack("B", data[2:3])
+                (escp["m"],) = struct.unpack("<H", data[3:5])
+            else:
+                raise ValueError(f"Incorrect parameters size '{elen}'.")
 
         elif ecode == b"V":
             # Set absolute vertical print position.
@@ -224,6 +294,17 @@ def escp_read(fin=None):
         elif ecode == b"/":
             # Set horizontal offset.
             (escp["offset"],) = struct.unpack("<L", data)
+
+        elif ecode == b"C":
+            # Set page length.
+            if elen == 2:
+                # Version 1.00.
+                (escp["length"],) = struct.unpack("<H", data)
+            elif elen == 4:
+                # Version 2.00. Extended.
+                (escp["length"],) = struct.unpack("<L", data)
+            else:
+                raise ValueError(f"Incorrect parameters size '{elen}'.")
 
         elif ecode == b"c":
             # Set page format.
