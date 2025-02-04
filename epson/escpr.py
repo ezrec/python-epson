@@ -179,7 +179,7 @@ class Interface(epson.escp.Interface):
 
         data += byte(clamp(18, cddim_id, 46))
         data += byte(clamp(114, cddim_od, 120))
-        date += byte(pd)
+        data += byte(pd)
 
         self._raster_cmd(b"j", b"sets", data)
 

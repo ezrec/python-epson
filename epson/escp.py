@@ -431,7 +431,7 @@ class Job(Interface):
 
         # ESC (D is used for "new style" raster, with ESC i.
         # For "old style" raster, with ESC ., it is omitted.
-        self._image_resolution()  # ESC (D
+        self._image_resolution(self.dpi, self.dpi)  # ESC (D
 
         # ESC/P set print format
         # TODO: ?
@@ -439,7 +439,7 @@ class Job(Interface):
         size = self._page_format(
             msid=self.msid, margin=self.margin, dpi=self.dpi
         )  # ESC (c
-        self._paper_dimension(msid=self.msid)  # ESC (S
+        self._paper_dimension(msid=self.msid, dpi=self.dpi)  # ESC (S
         self._print_method()  # ESC (m
 
         return size
@@ -465,10 +465,20 @@ class Job(Interface):
 
             self._vertical_position(y=delta_y)
             for y in range(0, min(size[1], raster.size[1])):
-                for color in range(0, 4):
+                # 0: K, 1: M, 2: C, 3: ?, 4: Y.
+                for color in [0, 1, 2, 4]:
                     line = raster.bitline(y=y, ci=color, bpp=bpp)
+                    if line is None:
+                        continue
+
                     self._horizontal_position(x=delta_x)
-                    self._send_line(line=line, bpp=bpp)
+
+                    self._send_line(
+                        color=color,
+                        line=line,
+                        bpp=bpp,
+                        compressed=False,
+                    )
 
                 self._vertical_increment(y=1)
 

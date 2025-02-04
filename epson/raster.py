@@ -54,9 +54,9 @@ class TestImage(Image):
         """Retrieve a bitmap of a line in a single color"""
 
         # Every 60 lines, change color
-        line_color = int(y / 60) % 15
+        line_color = int(y / 60) % 5
 
-        if (line_color & (1 << ci)) == 0:
+        if line_color != ci:
             return None
 
         width = self.size[0]
